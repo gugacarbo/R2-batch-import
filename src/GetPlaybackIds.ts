@@ -1,45 +1,59 @@
-require('dotenv/config')
+require("dotenv/config");
 
-import chalk from 'chalk';
-import fs from 'fs';
-import path from 'path';
+import chalk from "chalk";
+import fs from "fs";
+import path from "path";
+import { r2Client } from "./services/r2";
+import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 
-import { mux } from './services/mux';
-
-const outStream = fs.createWriteStream(path.join(__dirname, '..', 'data', 'export.csv'), {
-  flags: 'a',
-});
+const outStream = fs.createWriteStream(
+  path.join(__dirname, "..", "data", "export.csv"),
+  {
+    flags: "a",
+  }
+);
 
 async function getPlaybackIds() {
-  const assets = await mux.Video.Assets.list({
-    limit: 100,
+  console.log(chalk.blue("Fetching assets."));
 
-    // Change this from 1 to N based on how many assets you have and rerun the script
-    page: 1, 
-  })
+  const command = await r2Client.send(
+    new ListObjectsV2Command({ Bucket: "storage" })
+  );
 
-  console.log(chalk.green(`Importing ${assets.length} videos.`));
+  const assets = command.Contents ?? [];
 
-  assets.forEach(asset => {
-    const passthrough = asset.passthrough;
-    const playbackId = asset.playback_ids?.[0].id;
+  if (assets.length === 0) {
+    console.log(chalk.yellow("No assets found."));
+    return;
+  }
 
-    if (!passthrough) {
-      console.log(chalk.yellow(`Passthrough not found for: ${asset.id}`));
+  console.log(chalk.blue(`Importing ${command.KeyCount} videos.`));
+
+  outStream.write("Key,Size,Size (Bytes),Last Modified\n");
+
+  assets.forEach((asset) => {
+    const Key = asset.Key;
+    const Size = asset.Size;
+    const lastModiified = asset.LastModified;
+
+    if (!Key) {
+      console.log(chalk.yellow(`Key not found for: ${asset.Key}`));
       return;
     }
 
-    if (!playbackId) {
-      console.log(chalk.yellow(`Playback ID not found for: ${asset.id}`));
+    if (!Size) {
+      console.log(chalk.yellow(`Size not found for: ${asset.Key}`));
       return;
     }
 
-    outStream.write(`${[
-      passthrough,
-      playbackId,
-      Math.floor(Number(asset.duration)),
-    ].join(',')}\n`);
-  })
+    outStream.write(
+      `${[Key, Size, Math.floor(Number(asset.Size)), lastModiified].join(
+        ","
+      )}\n`
+    );
+  });
+
+  console.log(chalk.green("Exported data to CSV."));
 }
 
-getPlaybackIds()
+getPlaybackIds();

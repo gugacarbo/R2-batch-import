@@ -11,16 +11,25 @@
     "get-playback-ids": "ts-node src/GetPlaybackIds.ts"
   },
   "devDependencies": {
-    "@types/node": "^16.4.3",
-    "@types/request": "^2.48.6",
-    "ts-node": "^10.1.0",
-    "typescript": "^4.3.5"
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^16.18.96",
+    "@types/request": "^2.48.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^4.9.5"
   },
   "dependencies": {
-    "@mux/mux-node": "^3.2.3",
-    "chalk": "^4.1.1",
+    "@aws-sdk/client-s3": "^3.554.0",
+    "@aws-sdk/lib-storage": "^3.554.0",
+    "@types/cli-progress": "^3.11.5",
+    "@types/ora": "^3.2.0",
+    "axios": "^1.6.8",
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.12.0",
+    "cli-spinners": "^2.9.2",
     "dotenv": "^10.0.0",
-    "fastq": "^1.11.1",
-    "request": "^2.88.2"
+    "fastq": "^1.17.1",
+    "node-json-db": "^2.3.0",
+    "ora": "^8.0.1"
   }
 }
