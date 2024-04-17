@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uploader</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://kit.fontawesome.com/dd47628d23.js" crossorigin="anonymous"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <!--Favico-->
+  <link rel="icon" href="https://digitalscudero.com.br/favico.svg">
+  <style>
+    *::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    *::-webkit-scrollbar-track {
+      background: #171717;
+      border-radius: 50px;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 50px;
+      cursor: pointer;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+      background: #7e22ce;
+    }
+  </style>
+</head>
+
+<body class="flex flex-col items-center bg-gray-800 w-screen h-screen font-medium text-white">
+  <div class="flex flex-col items-center gap-2 bg-gray-600 mt-auto p-6 rounded-t-lg w-full max-w-screen-sm">
+    <div class="flex gap-3 w-full">
+      <div class="flex flex-col flex-1 items-center w-full max-w-52">
+
+        <div class="relative place-items-center grid bg-stone-800 rounded-md w-full overflow-hidden aspect-video">
+          <span class="-z-1 absolute text-stone-400-">Thumbnail</span>
+          <img id="thumbnail" src="https://via.placeholder.com/160x90" alt="Thumbnail"
+            class="absolute w-full h-full object-cover" />
+        </div>
+        <span id="duration" class="text-amber-500"></span>
+      </div>
+      <div class="flex flex-col max-w-sm">
+        <h1 id="title" class="flex text-2xl"></h1>
+        <h2 class="font-mono">
+          <span>Tamanho estimado:</span>
+          <small id="estimated-size-from" class="font-bold text-emerald-400"></small>
+          <i class="mx-0.5 fa-grip-lines-vertical text-xs fa-solid" id="estimativeSeparator"></i>
+          <small id="estimated-size" class="font-bold text-rose-300"></small>
+        </h2>
+        <h3 class="text-sm">
+          <span>Resolução: </span>
+          <span class="text-amber-400" id="width"></span>x<span class="text-amber-400" id="heigth"></span>
+        </h3>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 w-full">
+      <div class="flex items-center gap-1">
+        <i class="text-indigo-300 text-sm fa-hashtag fa-solid"></i><span id="video_id"></span>
+      </div>
+      <input type="text" name="link" id="link" disabled
+        class="flex bg-gray-900 disabled:opacity-50 px-3 py-1 border border-transparent rounded-md w-full font-medium text-white placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+        onclick="navigator.clipboard.writeText(document.getElementById('link').value)" />
+      <i class="hover:text-indigo-500 active:text-purple-500 transition active:duration-100 cursor-pointer fa-link fa-solid"
+        onclick="window.open(document.getElementById('link').value)"></i>
+      <i class="hover:text-indigo-500 active:text-purple-500 transition active:duration-100 cursor-pointer fa-copy fa-solid"
+        onclick="navigator.clipboard.writeText(document.getElementById('link').value)"></i>
+    </div>
+
+    <div class="place-items-center gap-1 w-full">
+      <label for="payloadBox" class="flex justify-center items-center gap-2 mb-2 w-full text-sm">Cole o JSON aqui
+        <button class="bg-gray-900 hover:bg-gray-800/90 px-2 py-1 rounded-md text-sm text-white transition"
+          id="pasteJson">Colar</button>
+      </label>
+      <textarea id="payloadBox"
+        class="flex border-input bg-gray-900 disabled:opacity-50 px-3 py-2 border rounded-md w-full min-h-[100px] text-white placeholder:text-muted-foreground disabled:cursor-not-allowed ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 text-sm resize-none"></textarea>
+    </div>
+    <div>
+    </div>
+    <div class="flex flex-col items-center gap-2">
+      <button id="send"
+        class="inline-flex justify-center items-center gap-1 bg-indigo-400 hover:bg-indigo-600/90 disabled:opacity-50 px-4 py-2 rounded-md h-10 font-medium text-sm text-white whitespace-nowrap transition-colors ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none">
+        <span>Enviar</span>
+        <b id="timer" class="place-items-center grid opacity-0 w-full text-center text-white transition">
+        </b>
+      </button>
+      <div id="bypassBox" class="flex flex-col items-center gap-1 opacity-0 group">
+        <label for="bypassInput" class="flex flex-col items-center cursor-pointer">
+          <div class="flex items-baseline gap-1">
+
+            <input type="checkbox" id="bypassInput" onchange="bypassInput = this.checked" class="">
+            <span>Ignorar nome do arquivo</span>
+          </div>
+          <span id="bypassValue" class="group-hover:bg-amber-950 bg-amber-900 px-2 py-1 rounded transition"></span>
+        </label>
+      </div>
+    </div>
+    <div class="relative place-items-center grid rounded-lg w-full overflow-hidden">
+
+      <b id="error"
+        class="inset-0 place-items-center grid bg-red-600 opacity-0 mx-auto p-2 w-full text-center text-lg text-white transition">
+      </b>
+    </div>
+  </div>
+  <div
+    class="flex flex-col items-center gap-4 bg-gray-800 shadow mb-auto pt-4 rounded-b-lg w-full max-w-screen-sm max-h-64 overflow-y-auto">
+    <h1 class="font-bold text-lg">Streaming <b id="currentStreaming"></b></h1>
+    <div id="uploadList"
+      class="flex flex-col items-center bg-gray-900 shadow mb-auto px-6 py-2 rounded-b-lg w-full max-w-screen-sm max-h-64 overflow-y-auto">
+    </div>
+  </div>
+
+  <script type="module">
+
+
+    const uploadList = {
+
+    };
+
+    const listBox = document.getElementById("uploadList");
+    function createListItem(id, item) {
+      const progressPercentage = ((item?.progress ?? 0) / item.total) * 100;
+
+      return `
+            <div class="flex flex-col gap-1 py-4 w-full">
+              <div class="flex items-center">
+                <i class="text-indigo-300 text-sm fa-hashtag fa-solid"></i>
+                <div class="flex items-baseline gap-2 w-full">
+                  <b class="text-indigo-300">${id}</b> 
+                  <span class="w-10/12 text-amber-300 text-sm truncate">${item.fileName}</span>
+                </div>
+              </div>
+            <div class="relative bg-gray-900 rounded-md w-full h-1.5">
+              <span style="width:${progressPercentage}%;"  class="absolute bg-indigo-500 rounded-md h-full transition-all duration-200 ease-in-out"></span>
+            </div>
+            <div class="flex justify-between items-center w-full">
+              <small>${item.progress} MB</small>
+              <small>Iniciado ${new Date(item?.startTime ?? 0).toLocaleDateString('pt-BR', {
+        day: "2-digit",
+        month: "2-digit",
+        hour: 'numeric',
+        minute: "numeric",
+        second: "numeric"
+
+      })}</small>
+              <small>${item.total} MB</small>
+            </div>
+            <div class="flex items-center gap-2 mx-auto">
+              <small>${item.speed} MB/s</small>
+              <small>${item.eta} s</small>
+            </div>
+          </div> 
+        `;
+    }
+
+    function updateList() {
+      console.log(uploadList)
+      listBox.innerHTML = Object.entries(uploadList).map(([id, item]) => createListItem(id, item)).join('');
+    }
+
+    var queueFull = false;
+    var socket = io('http://localhost:3000');
+
+    socket.on("connect", () => {
+      console.log("Connected")
+      getData()
+    });
+
+    const currentStreaming = document.getElementById("currentStreaming")
+
+    socket.on("upload_progress", (data) => {
+      uploadList[data.videoId] = data;
+      
+      const stramingCoung = Object.entries(uploadList).filter(([,up])=> up.progress != up.total)?.length;
+
+      currentStreaming.innerHTML = `${stramingCoung}` 
+      updateList();
+    });
+
+    socket.on("upload_done", () => {
+      console.log("Upload done")
+      if (queueFull) {
+        cleanup()
+        getData()
+      }
+    })
+    socket.on("worker_error", () => {
+      console.log("Error ")
+      if (queueFull) {
+        cleanup()
+        getData()
+      }
+    })
+
+
+    socket.on('gen_url_response', function (response) {
+      console.log("Received data", response)
+      if (response?.error) {
+        queueFull = true;
+        cleanup()
+        setError(response.error);
+        return;
+      }
+      queueFull = false;
+      setData(response)
+    });
+
+    socket.on('queue_response', function (data) {
+      console.log("Received queue response", data)
+
+      if (data?.error) {
+        setError(data.error);
+        return;
+      } else {
+        setError();
+        clearAll();
+        getData();
+      }
+    });
+
+    async function getData() {
+      console.log("Requesting data")
+      socket.emit('gen_url');
+    }
+
+    async function sendData(data) {
+      console.log("Sending data", data)
+      socket.emit('queue', data);
+    }
+
+
+    let uploadData = {};
+    let video_id = "";
+    let title = ''
+    let isExpired = false;
+    let expireAt = 0;
+    let width = 0;
+    let height = 0;
+    let expire_verifier
+
+    let bypassName = false;
+
+    const errorBox = document.getElementById("error");
+    const sendBtn = document.getElementById("send");
+    const payloadBox = document.getElementById("payloadBox");
+
+    const link = document.getElementById("link");
+    const titleBox = document.getElementById("title");
+
+    const thumbnail = document.getElementById("thumbnail");
+    const pasteJsonBtn = document.getElementById("pasteJson");
+
+    const timer = document.getElementById("timer");
+
+    const bypassBox = document.getElementById("bypassBox");
+    const bypassInput = document.getElementById("bypassInput");
+    const bypassValue = document.getElementById("bypassValue");
+
+    const estimatedLow = document.getElementById("estimated-size-from");
+    const estimatedHigh = document.getElementById("estimated-size");
+
+    pasteJsonBtn.addEventListener("click", () => {
+      navigator.clipboard.readText().then(text => {
+        setPayload(text)
+        onInput();
+      })
+    });
+
+    bypassInput.addEventListener("change", () => {
+      bypassName = bypassInput.checked;
+      bypassValue.classList.toggle("bg-emerald-800", bypassName);
+      bypassValue.classList.toggle("group-hover:bg-emerald-900", bypassName);
+      disableButton();
+    });
+
+    sendBtn.addEventListener("click", async () => {
+
+      if (isExpired) {
+        handleExpiresTimer();
+        return;
+      }
+
+      if (expireAt < Date.now() + 1000 * 20) {
+        setError("Link expirará muito em breve.");
+        return;
+      }
+
+      sendData({
+        ...uploadData,
+        videoId: video_id,
+      })
+
+    });
+
+
+    function setData(response) {
+      setVideoData(response)
+      setDuration(Number(response.duration));
+      setResolution(response?.dimensions?.width, response?.dimensions?.height)
+      estimateVideoSize(Number(response.duration) / 1000);
+    }
+
+    function startVerifyExpiration() {
+      handleExpiresTimer();
+      isExpired = false;
+
+      expire_verifier = setInterval(() => {
+        handleExpiresTimer();
+        if (isExpired) {
+          clearInterval(expire_verifier);
+          return;
+        }
+
+      }, 1000);
+    }
+
+    function handleExpiresTimer() {
+      if (expireAt < Date.now()) {
+        setError("O link expirou.");
+        timer.innerText = '';
+        timer.classList.add("opacity-0")
+        isExpired = true;
+        return;
+      }
+
+      if (expireAt < Date.now() + 1000 * 20) {
+        sendBtn.classList.add("bg-red-600")
+      }
+      else if (expireAt < Date.now() + 1000 * 60) {
+        sendBtn.classList.remove("bg-red-500")
+        sendBtn.classList.add("bg-orange-500")
+      }
+      else {
+        sendBtn.classList.remove("bg-orange-500")
+        sendBtn.classList.remove("bg-red-600")
+      }
+
+      timer.classList.remove("opacity-0")
+      timer.innerText = ((Number(expireAt) - Date.now()) / 1000).toFixed(0) + "s";
+    }
+
+
+    function onInput() {
+      if (!payloadBox.value.trim()) {
+        clearAll();
+        return;
+      }
+      let response;
+      try {
+        response = JSON.parse(payloadBox?.value.trim());
+        errorBox.innerText = "";
+        setError();
+      } catch (e) {
+        setError(e.message);
+        return;
+      }
+
+      uploadData = {
+        videoId: video_id,
+        ...response,
+        ...extractDataFromUrl(response.videoUrl),
+      };
+
+      expireAt = uploadData.expires;
+
+      validateFileName(uploadData.fileName.replace(/\.[^/.]+$/, ""));
+      startVerifyExpiration();
+    }
+
+    payloadBox.addEventListener("input", () => {
+      clearTimeout(onInput);
+      setTimeout(onInput, 100);
+    });
+
+
+
+    function setVideoData(data) {
+
+      video_id = data?.id ?? '';
+      title = data?.title ?? '';
+      thumbnail.src = data?.thumbnail ?? "https://via.placeholder.com/320x180";
+      link.value = data?.url ?? '';
+      titleBox.innerText = data?.title ?? '';
+      document.getElementById("video_id").innerText = video_id;
+
+      return data
+    }
+
+    function setDuration(t) {
+      const duration = (t / 1000 / 60)
+      document.getElementById("duration").innerText =
+        (duration > 120 ? duration / 60 : duration).toFixed(2).replace(".", ',') + (duration > 120 ? " horas" : " min");
+    }
+
+    export function extractDataFromUrl(url) {
+      const urlObj = new URL(url);
+      const expires = Number(urlObj.searchParams.get("Expires")) * 1000;
+      const responseContentDisposition = urlObj.searchParams.get(
+        "response-content-disposition"
+      );
+      const fileName =
+        responseContentDisposition?.match(/filename="(.+?)"/)[1];
+      return {
+        expires,
+        fileName,
+      };
+    }
+
+    function validateFileName(name) {
+
+      if (name && name == title) {
+        closeBypassBox();
+        return;
+      }
+      openBypassBox(name);
+      setError("O nome do arquivo não corresponde ao esperado.");
+    }
+
+    function disableButton(disabled = true) {
+
+      if (bypassName && !queueFull) {
+        sendBtn.removeAttribute("disabled");
+        sendBtn.classList.remove("bg-red-500");
+        return;
+      }
+
+      sendBtn.classList.toggle("bg-red-500", disabled);
+      disabled ?
+        sendBtn.setAttribute("disabled", true) :
+        sendBtn.removeAttribute("disabled");
+    }
+
+
+    function setResolution(w = 0, h = 0) {
+      width = w ?? 0;
+      height = h ?? 0;
+      document.getElementById("width").innerText = width;
+      document.getElementById("heigth").innerText = height;
+    }
+
+    function estimateVideoSize(duration) {
+      const estimated = ((duration / 60) * 22.545454);
+
+      const isLarge = estimated > 1024;
+
+
+      estimatedLow.innerText = `${(isLarge ? (estimated / 1024) : estimated).toFixed(2)}${isLarge ? " GB" : " MB"}`;
+
+      estimatedHigh.innerText = `${(isLarge ? (estimated * 1.5 / 1024) : (estimated * 1.5)).toFixed(2)}${isLarge ? " GB" : " MB"}`;
+
+      if (width <= 1280 || height <= 720) {
+        estimatedLow.classList.add("text-sm", "text-green-400")
+        estimatedHigh.classList.remove("text-sm", "text-red-400")
+        document.getElementById("estimativeSeparator").classList.add("text-green-400")
+        document.getElementById("estimativeSeparator").classList.remove("text-red-400")
+      }
+      else {
+
+        estimatedLow.classList.remove("text-sm", "text-green-400")
+        estimatedHigh.classList.add("text-sm", "text-red-400")
+        document.getElementById("estimativeSeparator").classList.remove("text-green-400")
+        document.getElementById("estimativeSeparator").classList.add("text-red-400")
+      }
+
+    }
+
+    function openBypassBox(name) {
+      if (isExpired) {
+        closeBypassBox();
+        return;
+      }
+      bypassValue.innerText = name;
+      bypassName = false;
+      bypassInput.checked = false;
+      bypassBox.classList.remove("opacity-0")
+    }
+
+    function closeBypassBox() {
+      bypassName = false;
+      bypassInput.checked = false;
+      bypassBox.classList.add("opacity-0")
+    }
+
+    function setPayload(response) {
+      payloadBox.value = response;
+    }
+
+    function setError(message = null) {
+      if (!message) {
+        errorBox.classList.add("opacity-0");
+        errorBox.innerText = "";
+        disableButton(false);
+        isExpired = false;
+        return;
+      }
+      disableButton();
+      errorBox.innerText = message;
+      errorBox.classList.remove("opacity-0");
+    }
+
+
+
+
+    function clearAll() {
+      clearInterval(expire_verifier);
+
+      timer.innerText = '';
+      timer.classList.add("opacity-0")
+
+      setError("");
+
+      disableButton();
+      setPayload("");
+      closeBypassBox();
+
+      expireAt = 0;
+      isExpired = false;
+    }
+
+    function cleanup() {
+      clearAll();
+      setVideoData({});
+      setDuration(0);
+      setResolution(0, 0);
+      estimateVideoSize(0);
+    }
+
+  </script>
+</body>
+
+</html>
